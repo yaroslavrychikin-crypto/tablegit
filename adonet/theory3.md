@@ -210,7 +210,7 @@ namespace DataSetGuide
                 SqlCommandBuilder builder = new SqlCommandBuilder(adapter);
 
                 adapter.Fill(productsTable);
-            }
+            
 
             Console.WriteLine($"Загружено строк: {productsTable.Rows.Count}");
 
@@ -232,8 +232,7 @@ namespace DataSetGuide
             // 3. Отправляем изменения в БД
             //    adapter.Update анализирует RowState каждой строки:
             //    Added -> InsertCommand, Modified -> UpdateCommand, Deleted -> DeleteCommand
-            using (SqlConnection conn = new SqlConnection(ConnectionString))
-            {
+
                 adapter.Update(productsTable);
             }
 
