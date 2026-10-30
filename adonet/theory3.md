@@ -370,17 +370,18 @@ foreach (DataRow row in expensive.Rows)
 
 **Решение:**
 ```csharp
+using Microsoft.Data.SqlClient;
+using System.Data;
+string ConnectionString = @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=ShopDB;Integrated Security=True;";
 DataSet ds = new DataSet();
-using (SqlDataAdapter da = new SqlDataAdapter("SELECT * FROM Categories", ConnectionString))
-    da.Fill(ds, "Categories");
-using (SqlDataAdapter da = new SqlDataAdapter("SELECT * FROM Products", ConnectionString))
-    da.Fill(ds, "Products");
+using (SqlDataAdapter da = new SqlDataAdapter("SELECT * FROM Categories;SELECT * FROM Products", ConnectionString))
+    da.Fill(ds); //  Categories -> Table, Products->Table1
 
 ds.Relations.Add("CatProd",
-    ds.Tables["Categories"].Columns["CategoryID"],
-    ds.Tables["Products"].Columns["CategoryID"]);
+    ds.Tables["Table"].Columns["CategoryID"],
+    ds.Tables["Table1"].Columns["CategoryID"]);
 
-foreach (DataRow cat in ds.Tables["Categories"].Rows)
+foreach (DataRow cat in ds.Tables["Table"].Rows)
 {
     int count = cat.GetChildRows("CatProd").Length;
     Console.WriteLine($"{cat["CategoryName"]}: {count} товаров");
