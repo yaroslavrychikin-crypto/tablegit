@@ -91,7 +91,7 @@ private const string ConnectionString =
 
 ### Задача 6. Отменить долгий запрос через 2 секунды
 
-**Задание:** Используйте `dbo.usp_SlowQuery` (из предыдущего скрипта) с `@DelaySeconds = 30`. Создайте `CancellationTokenSource`, вызовите `CancelAfter(TimeSpan.FromSeconds(2))`, перехватите `OperationCanceledException` и выведите `"Отменено за 2 сек"`.
+**Задание:** Используйте `dbo.usp_SlowQuery` с `@DelaySeconds = 30`. Создайте `CancellationTokenSource`, вызовите `CancelAfter(TimeSpan.FromSeconds(2))`, перехватите `OperationCanceledException` и выведите `"Отменено за 2 сек"`.
 
 **Проверяется:**
 - Понимание, что `CancellationToken` **прерывает** ожидание, а не просто проверяется между операциями.
