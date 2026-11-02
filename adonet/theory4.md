@@ -319,7 +319,7 @@ public class AsyncAdoExample
 {
     // Строка подключения. В реальном коде храните ее в конфигурации.
     private const string ConnectionString = 
-        "Server=localhost;Database=AdventureWorks;Integrated Security=true;TrustServerCertificate=true;";
+        "Server=localhost;Database=AsyncAdoTestDb;Integrated Security=true;TrustServerCertificate=true;";
 
     /// <summary>
     /// Асинхронно читает данные, используя токен отмены и таймаут команды.
