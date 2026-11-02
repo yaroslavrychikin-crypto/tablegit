@@ -1,5 +1,285 @@
 # Асинхронная работа в ADO.NET: полное руководство с примерами
 
+## 0. БД
+
+# Полная тестовая база данных для проверки всех примеров асинхронного ADO.NET
+
+Ниже — полностью рабочий скрипт, который создаёт базу данных со всеми таблицами, данными и объектами, необходимыми для запуска **всех** примеров из предыдущих ответов. Скрипт рассчитан на SQL Server (LocalDB, Express, Developer или полноценный).
+
+
+## 0.1. Скрипт создания базы данных и объектов
+
+```sql
+-- ============================================================
+-- СОЗДАНИЕ БАЗЫ ДАННЫХ
+-- ============================================================
+IF DB_ID('AsyncAdoTestDb') IS NOT NULL
+BEGIN
+    ALTER DATABASE AsyncAdoTestDb SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE AsyncAdoTestDb;
+END
+GO
+
+CREATE DATABASE AsyncAdoTestDb;
+GO
+
+USE AsyncAdoTestDb;
+GO
+
+-- ============================================================
+-- СХЕМЫ (имитация структуры AdventureWorks для совместимости)
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'Person')
+    EXEC('CREATE SCHEMA Person');
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'HumanResources')
+    EXEC('CREATE SCHEMA HumanResources');
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'dbo')
+    EXEC('CREATE SCHEMA dbo');
+GO
+
+-- ============================================================
+-- ТАБЛИЦА Person.Person (используется в ReadDataAsync, UpdateDataAsync,
+-- PerformTransactionAsync, ReadMultipleSetsAsync, GetPeopleAsync)
+-- ============================================================
+CREATE TABLE Person.Person
+(
+    BusinessEntityID INT IDENTITY(1,1) NOT NULL
+        CONSTRAINT PK_Person_Person PRIMARY KEY,
+    FirstName        NVARCHAR(50)  NOT NULL,
+    LastName         NVARCHAR(50)  NOT NULL,
+    ModifiedDate     DATETIME2(0)  NOT NULL
+        CONSTRAINT DF_Person_ModifiedDate DEFAULT (SYSUTCDATETIME())
+);
+GO
+
+-- ============================================================
+-- ТАБЛИЦА HumanResources.Employee (используется в ReadMultipleSetsAsync)
+-- ============================================================
+CREATE TABLE HumanResources.Employee
+(
+    BusinessEntityID INT IDENTITY(1,1) NOT NULL
+        CONSTRAINT PK_Employee PRIMARY KEY,
+    JobTitle         NVARCHAR(100) NOT NULL,
+    HireDate         DATE          NOT NULL,
+    VacationHours    SMALLINT      NOT NULL
+        CONSTRAINT DF_Employee_VacationHours DEFAULT (0)
+);
+GO
+
+-- ============================================================
+-- ТАБЛИЦА dbo.Documents (используется в ReadLargeBlobAsync — потоковое чтение)
+-- ============================================================
+CREATE TABLE dbo.Documents
+(
+    Id          INT IDENTITY(1,1) NOT NULL
+        CONSTRAINT PK_Documents PRIMARY KEY,
+    LargeData   VARBINARY(MAX)    NULL,
+    Description NVARCHAR(500)     NULL
+);
+GO
+
+-- ============================================================
+-- ТАБЛИЦА dbo.MyTargetTable (используется в BulkInsertAsync)
+-- ============================================================
+CREATE TABLE dbo.MyTargetTable
+(
+    Id        INT IDENTITY(1,1) NOT NULL
+        CONSTRAINT PK_MyTargetTable PRIMARY KEY,
+    Name      NVARCHAR(100)     NOT NULL,
+    Amount    DECIMAL(18,2)     NOT NULL,
+    CreatedAt DATETIME2(0)      NOT NULL
+        CONSTRAINT DF_Target_CreatedAt DEFAULT (SYSUTCDATETIME())
+);
+GO
+
+-- ============================================================
+-- ТАБЛИЦА dbo.Categories (используется в StreamTwoTablesAsync — MARS)
+-- ============================================================
+CREATE TABLE dbo.Categories
+(
+    Id   INT IDENTITY(1,1) NOT NULL
+        CONSTRAINT PK_Categories PRIMARY KEY,
+    Name NVARCHAR(100)     NOT NULL
+);
+GO
+
+-- ============================================================
+-- ТАБЛИЦА dbo.Products (используется в StreamTwoTablesAsync — MARS)
+-- ============================================================
+CREATE TABLE dbo.Products
+(
+    Id           INT IDENTITY(1,1) NOT NULL
+        CONSTRAINT PK_Products PRIMARY KEY,
+    CategoryId   INT              NOT NULL
+        CONSTRAINT FK_Products_Categories REFERENCES dbo.Categories(Id),
+    ProductName  NVARCHAR(100)    NOT NULL,
+    Price        DECIMAL(18,2)    NOT NULL
+);
+GO
+
+-- ============================================================
+-- ИНДЕКСЫ ДЛЯ ПРОИЗВОДИТЕЛЬНОСТИ
+-- ============================================================
+CREATE INDEX IX_Person_LastName ON Person.Person(LastName);
+CREATE INDEX IX_Products_CategoryId ON dbo.Products(CategoryId, Id);
+GO
+
+-- ============================================================
+-- НАПОЛНЕНИЕ ДАННЫМИ
+-- ============================================================
+
+-- Person.Person — 50 записей
+;WITH Numbers AS
+(
+    SELECT TOP (50) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
+    FROM sys.all_objects
+)
+INSERT INTO Person.Person (FirstName, LastName)
+SELECT
+    CHOOSE((n % 5) + 1, 'John', 'Jane', 'Michael', 'Anna', 'Sergey'),
+    CHOOSE((n % 7) + 1, 'Smith', 'Johnson', 'Brown', 'Ivanov', 'Petrov', 'Lee', 'Garcia')
+FROM Numbers;
+GO
+
+-- HumanResources.Employee — 20 записей
+;WITH Numbers AS
+(
+    SELECT TOP (20) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
+    FROM sys.all_objects
+)
+INSERT INTO HumanResources.Employee (JobTitle, HireDate, VacationHours)
+SELECT
+    CHOOSE((n % 4) + 1, 'Engineer', 'Manager', 'Analyst', 'Clerk'),
+    DATEADD(DAY, -n * 30, CAST('2024-01-01' AS DATE)),
+    (n * 5) % 40
+FROM Numbers;
+GO
+
+-- dbo.Documents — 3 записи с BLOB разных размеров
+INSERT INTO dbo.Documents (LargeData, Description)
+VALUES
+    (REPLICATE(CAST('A' AS VARBINARY(MAX)), 1024),        'Small blob: 1 KB'),
+    (REPLICATE(CAST('B' AS VARBINARY(MAX)), 1048576),     'Medium blob: 1 MB'),
+    (REPLICATE(CAST('C' AS VARBINARY(MAX)), 10485760),    'Large blob: 10 MB');
+GO
+
+-- dbo.MyTargetTable — пустая, заполнится через SqlBulkCopy
+
+-- dbo.Categories — 5 записей
+INSERT INTO dbo.Categories (Name) VALUES
+    ('Electronics'), ('Books'), ('Clothing'), ('Food'), ('Sports');
+GO
+
+-- dbo.Products — 20 записей, распределённых по категориям
+;WITH Numbers AS
+(
+    SELECT TOP (20) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
+    FROM sys.all_objects
+)
+INSERT INTO dbo.Products (CategoryId, ProductName, Price)
+SELECT
+    ((n - 1) % 5) + 1,
+    CONCAT('Product-', n),
+    CAST(10.00 + n * 1.5 AS DECIMAL(18,2))
+FROM Numbers;
+GO
+
+-- ============================================================
+-- ХРАНИМАЯ ПРОЦЕДУРА (проверка ExecuteReaderAsync с параметрами)
+-- ============================================================
+CREATE OR ALTER PROCEDURE dbo.usp_GetPersonById
+    @BusinessEntityID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT BusinessEntityID, FirstName, LastName, ModifiedDate
+    FROM Person.Person
+    WHERE BusinessEntityID = @BusinessEntityID;
+END
+GO
+
+-- ============================================================
+-- ПРОВЕРКА
+-- ============================================================
+SELECT 'Person.Person' AS TableName, COUNT(*) AS RowCount FROM Person.Person
+UNION ALL
+SELECT 'HumanResources.Employee', COUNT(*) FROM HumanResources.Employee
+UNION ALL
+SELECT 'dbo.Documents', COUNT(*) FROM dbo.Documents
+UNION ALL
+SELECT 'dbo.MyTargetTable', COUNT(*) FROM dbo.MyTargetTable
+UNION ALL
+SELECT 'dbo.Categories', COUNT(*) FROM dbo.Categories
+UNION ALL
+SELECT 'dbo.Products', COUNT(*) FROM dbo.Products;
+GO
+```
+
+**Ожидаемый результат в конце:**
+
+| TableName | RowCount |
+|---|---|
+| Person.Person | 50 |
+| HumanResources.Employee | 20 |
+| dbo.Documents | 3 |
+| dbo.MyTargetTable | 0 |
+| dbo.Categories | 5 |
+| dbo.Products | 20 |
+
+
+## 0.2. Строка подключения
+
+После выполнения скрипта используйте одну из строк подключения:
+
+**LocalDB (SQL Server Express LocalDB — устанавливается с Visual Studio):**
+```csharp
+private const string ConnectionString =
+    @"Server=(localdb)\MSSQLLocalDB;Database=AsyncAdoTestDb;Integrated Security=true;TrustServerCertificate=true;";
+```
+
+**SQL Server Express / Developer:**
+```csharp
+private const string ConnectionString =
+    @"Server=localhost\SQLEXPRESS;Database=AsyncAdoTestDb;Integrated Security=true;TrustServerCertificate=true;";
+```
+
+**Полноценный SQL Server с логином/паролем:**
+```csharp
+private const string ConnectionString =
+    @"Server=localhost;Database=AsyncAdoTestDb;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=true;";
+```
+
+## 0.3. Дополнительные сценарии для проверки edge-кейсов
+
+Если хотите проверить **отмену, таймауты и обработку ошибок**, добавьте в БД «тяжёлые» объекты:
+
+```sql
+USE AsyncAdoTestDb;
+GO
+
+-- Тяжёлый запрос для проверки отмены (WAITFOR)
+CREATE OR ALTER PROCEDURE dbo.usp_SlowQuery
+    @DelaySeconds INT = 30
+AS
+BEGIN
+    SET NOCOUNT ON;
+    WAITFOR DELAY @DelaySeconds;
+    SELECT 'Done' AS Result;
+END
+GO
+
+-- Таблица-жертва для проверки deadlock / конфликта блокировок
+CREATE TABLE dbo.LockTest
+(
+    Id    INT NOT NULL PRIMARY KEY,
+    Value NVARCHAR(100) NOT NULL
+);
+INSERT INTO dbo.LockTest (Id, Value) VALUES (1, 'A'), (2, 'B');
+GO
+```
+
+---
+
 Асинхронное программирование в ADO.NET — это не просто замена синхронных методов на их аналоги с суффиксом `Async`. Это фундаментальное изменение того, как приложение использует потоки при ожидании операций ввода-вывода (сеть, диск). Ниже разобраны все ключевые нюансы, подводные камни и приведены полностью рабочие примеры для типовых и не очень ситуаций.
 
 ---
