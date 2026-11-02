@@ -158,9 +158,9 @@ GO
 -- dbo.Documents — 3 записи с BLOB разных размеров
 INSERT INTO dbo.Documents (LargeData, Description)
 VALUES
-    (REPLICATE(CAST('A' AS VARBINARY(MAX)), 1024),        'Small blob: 1 KB'),
-    (REPLICATE(CAST('B' AS VARBINARY(MAX)), 1048576),     'Medium blob: 1 MB'),
-    (REPLICATE(CAST('C' AS VARBINARY(MAX)), 10485760),    'Large blob: 10 MB');
+    (CONVERT(VARBINARY(MAX), REPLICATE(CAST('A' AS VARCHAR(MAX)), 1024)),    'Small blob: 1 KB'),
+    (CONVERT(VARBINARY(MAX), REPLICATE(CAST('B' AS VARCHAR(MAX)), 1048576)), 'Medium blob: 1 MB'),
+    (CONVERT(VARBINARY(MAX), REPLICATE(CAST('C' AS VARCHAR(MAX)), 10485760)),'Large blob: 10 MB');
 GO
 
 -- dbo.MyTargetTable — пустая, заполнится через SqlBulkCopy
