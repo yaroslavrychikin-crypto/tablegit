@@ -201,7 +201,7 @@ GO
 -- ============================================================
 -- ПРОВЕРКА
 -- ============================================================
-SELECT 'Person.Person' AS TableName, COUNT(*) AS RowCount FROM Person.Person
+SELECT 'Person.Person' AS TableName, COUNT(*) FROM Person.Person
 UNION ALL
 SELECT 'HumanResources.Employee', COUNT(*) FROM HumanResources.Employee
 UNION ALL
