@@ -233,59 +233,13 @@ private const string ConnectionString =
 
 ---
 
-## ТЕМА 5. Потоковое чтение больших данных (задачи 16–18)
-
-**Цель:** освоить `SequentialAccess`, `GetStream`, `GetFieldValueAsync` для BLOB.
-
----
-
-### Задача 16. Прочитать 1 МБ BLOB в `byte[]`
-
-**Задание:** Метод `Task<byte[]> GetDocumentDataAsync(int id)` возвращает `LargeData` для документа с данным `Id`.
-
-**Проверяется:**
-- `CommandBehavior.SequentialAccess`
-- `GetFieldValueAsync<byte[]>` для полей `VARBINARY(MAX)`
-
-**Ожидаемый результат:** массив длиной `1_048_576` для `id=2`.
-
-**Ловушка:** для `VARBINARY(MAX)` без `SequentialAccess` драйвер загрузит **всю строку** в буфер. Для 10 МБ это заметно по памяти.
-
----
-
-### Задача 17. Прочитать 10 МБ BLOB **без** загрузки в память
-
-**Задание:** Метод `Task<long> GetDocumentSizeAsync(int id)` возвращает размер BLOB, но **не** создаёт массив `byte[]`. Используйте `GetStream` и `stream.CopyToAsync(Stream.Null)`.
-
-**Проверяется:**
-- `GetStream` + `CopyToAsync` для потоковой обработки.
-
-**Ожидаемый результат:** `10_485_760` без выделения 10 МБ памяти.
-
-**Ловушка:** `stream.Length` не всегда работает для потокового BLOB (может выбросить `NotSupportedException`). Считайте через `ReadAsync` в буфер или через `CopyToAsync`.
-
----
-
-### Задача 18. Потоковая запись BLOB из файла
-
-**Задание:** Метод `Task InsertDocumentFromFileAsync(string filePath)` вставляет файл как `VARBINARY(MAX)` в `dbo.Documents`. Используйте `File.OpenRead` + параметр с `SqlDbType.VarBinary` и `Size = -1` (MAX).
-
-**Проверяется:**
-- `SqlDbType.VarBinary` с `Size = -1` — правильный способ передать `VARBINARY(MAX)`.
-
-**Ожидаемый результат:** файл сохранён в БД, размер в БД = размеру файла.
-
-**Ловушка:** если указать `Size = 8000` (или не указать вовсе), драйвер обрежет данные или выбросит `SqlException` о truncation.
-
----
-
-## ТЕМА 6. SqlBulkCopy и пул соединений (задачи 19–22)
+## ТЕМА 5. SqlBulkCopy  (задачи 16–21)
 
 **Цель:** освоить массовую загрузку и понять поведение пула.
 
 ---
 
-### Задача 19. Загрузить 1000 строк через SqlBulkCopy
+### Задача 16. Загрузить 1000 строк через SqlBulkCopy
 
 **Задание:** Создайте `DataTable` с колонками `Name`, `Amount`, `CreatedAt` (1000 строк), загрузите в `dbo.MyTargetTable` через `WriteToServerAsync`.
 
@@ -299,7 +253,7 @@ private const string ConnectionString =
 
 ---
 
-### Задача 20. Отменить SqlBulkCopy на середине
+### Задача 17. Отменить SqlBulkCopy на середине
 
 **Задание:** Загрузите 50 000 строк, но отмените через `CancelAfter(50ms)`. Перехватите `OperationCanceledException`. Проверьте `COUNT(*)` в `MyTargetTable` — должно быть **меньше 50 000** (частичная загрузка).
 
@@ -312,7 +266,7 @@ private const string ConnectionString =
 
 ---
 
-### Задача 21. Проверить переиспользование пула
+### Задача 18. Проверить переиспользование пула
 
 **Задание:** Откройте и закройте 5 соединений подряд. В каждом выполните `SELECT @@SPID`. Соберите `SPID` в список. Убедитесь, что все 5 `SPID` одинаковы.
 
@@ -325,7 +279,7 @@ private const string ConnectionString =
 
 ---
 
-### Задача 22. Воспроизвести исчерпание пула
+### Задача 19. Воспроизвести исчерпание пула
 
 **Задание:** Используйте строку подключения с `Max Pool Size=1;Connect Timeout=2`. Откройте первое соединение и **не закрывайте**. Попробуйте открыть второе — перехватите `SqlException` с сообщением о таймауте пула.
 
@@ -338,13 +292,13 @@ private const string ConnectionString =
 
 ---
 
-## ТЕМА 7. Комплексные сценарии (задачи 23–25)
+## ТЕМА 7. Комплексный сценарий 
 
 **Цель:** собрать всё вместе.
 
 ---
 
-### Задача 23. Репозиторий с полным async/await и ConfigureAwait
+### Задача 20. Репозиторий с полным async/await и ConfigureAwait
 
 **Задание:** Напишите класс `AsyncPersonRepository` с методами:
 - `Task<List<Person>> GetAllAsync(CancellationToken)`
