@@ -155,6 +155,7 @@ EF Core передаёт `CancellationToken` в провайдер базы да
 ```c#
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.SqlServer;
 ```
 
 Для NET 8 -> 8 версию
