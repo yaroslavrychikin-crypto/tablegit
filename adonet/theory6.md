@@ -150,6 +150,17 @@ EF Core передаёт `CancellationToken` в провайдер базы да
 
 ## 7. База данных для примеров
 
+### 7.0
+Потребуется скачать через nuget:
+```c#
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+```
+
+Для NET 8 -> 8 версию
+Для NET 9 -> 9 версию
+Для NET 10 -> 10 версию
+
 ### 7.1. Скрипт создания БД
 
 ```sql
@@ -192,24 +203,24 @@ GO
 
 -- Наполнение
 INSERT INTO dbo.Authors (Name, Country, BirthDate) VALUES
-('Лев Толстой', 'Россия', '1828-09-09'),
-('Фёдор Достоевский', 'Россия', '1821-11-11'),
-('Джордж Оруэлл', 'Великобритания', '1903-06-25'),
-('Эрнест Хемингуэй', 'США', '1899-07-21'),
-('Габриэль Гарсиа Маркес', 'Колумбия', '1927-03-06');
+(N'Лев Толстой', N'Россия', '1828-09-09'),
+(N'Фёдор Достоевский', N'Россия', '1821-11-11'),
+(N'Джордж Оруэлл', N'Великобритания', '1903-06-25'),
+(N'Эрнест Хемингуэй', N'США', '1899-07-21'),
+(N'Габриэль Гарсиа Маркес', N'Колумбия', '1927-03-06');
 GO
 
 INSERT INTO dbo.Books (Title, AuthorId, Price, PublishedAt, Content) VALUES
-('Война и мир', 1, 1500.00, '1869-01-01', REPLICATE('A', 10000)),
-('Анна Каренина', 1, 1200.00, '1878-01-01', NULL),
-('Преступление и наказание', 2, 900.00, '1866-01-01', NULL),
-('Братья Карамазовы', 2, 1100.00, '1880-01-01', NULL),
-('1984', 3, 800.00, '1949-06-08', REPLICATE('B', 50000)),
-('Скотный двор', 3, 600.00, '1945-08-17', NULL),
-('Старик и море', 4, 700.00, '1952-09-01', NULL),
-('Прощай, оружие!', 4, 750.00, '1929-09-27', NULL),
-('Сто лет одиночества', 5, 1300.00, '1967-05-30', REPLICATE('C', 100000)),
-('Любовь во время чумы', 5, 950.00, '1985-01-01', NULL);
+(N'Война и мир', 1, 1500.00, '1869-01-01', REPLICATE('A', 10000)),
+(N'Анна Каренина', 1, 1200.00, '1878-01-01', NULL),
+(N'Преступление и наказание', 2, 900.00, '1866-01-01', NULL),
+(N'Братья Карамазовы', 2, 1100.00, '1880-01-01', NULL),
+(N'1984', 3, 800.00, '1949-06-08', REPLICATE('B', 50000)),
+(N'Скотный двор', 3, 600.00, '1945-08-17', NULL),
+(N'Старик и море', 4, 700.00, '1952-09-01', NULL),
+(N'Прощай, оружие!', 4, 750.00, '1929-09-27', NULL),
+(N'Сто лет одиночества', 5, 1300.00, '1967-05-30', REPLICATE('C', 100000)),
+(N'Любовь во время чумы', 5, 950.00, '1985-01-01', NULL);
 GO
 
 SELECT COUNT(*) AS AuthorsCount FROM dbo.Authors;  -- 5
@@ -261,6 +272,32 @@ public class AppDbContext : DbContext
             .WithMany(a => a.Books)
             .HasForeignKey(b => b.AuthorId);
     }
+}
+//Для примера 4 с фабрикой
+public class AppDbContext1 : DbContext
+{
+    // ✔ Единственный конструктор — принимает опции от фабрики/DI
+    public AppDbContext1(DbContextOptions<AppDbContext1> options)
+        : base(options)
+    {
+    }
+
+    public DbSet<Author> Authors => Set<Author>();
+    public DbSet<Book> Books => Set<Book>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Book>()
+            .HasOne(b => b.Author)
+            .WithMany(a => a.Books)
+            .HasForeignKey(b => b.AuthorId);
+
+        modelBuilder.Entity<Book>()
+            .Property(b => b.Price)
+            .HasPrecision(18, 2);
+    }
+
+    // ❌ OnConfiguring НЕ переопределяем — конфигурация приходит через options
 }
 ```
 
@@ -375,8 +412,8 @@ public static async Task Example4_ParallelWithFactoryAsync()
     Console.WriteLine("\n=== Пример 4: Параллельные запросы через IDbContextFactory ===");
 
     // Создаём фабрику вручную (в ASP.NET Core она регистрируется в DI)
-    var factory = new PooledDbContextFactory<AppDbContext>(
-        new DbContextOptionsBuilder<AppDbContext>()
+    var factory = new PooledDbContextFactory<AppDbContext1>(
+        new DbContextOptionsBuilder<AppDbContext1>()
             .UseSqlServer(@"Server=(localdb)\MSSQLLocalDB;Database=EfCoreTestDb;Integrated Security=true;TrustServerCertificate=true;")
             .Options);
 
