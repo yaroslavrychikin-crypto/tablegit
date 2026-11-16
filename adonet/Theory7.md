@@ -282,7 +282,7 @@ var sql = """
 
 var books = connection.Query<Book, Author, Book>(
     sql,
-    (book, author) => { book.Author = author; return book; },
+    (book, author) => { book.Author = author.Name; return book; },
     splitOn: "AuthorId"  // граница: AuthorId — первая колонка Author
 ).ToList();
 ```
