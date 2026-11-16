@@ -30,7 +30,7 @@ Dapper уместен там, где нужен полный контроль н
 using Microsoft.Data.Sqlite;
 using Dapper;
 
-var connectionString = "Data Source=:memory:";
+var connectionString = "Data Source=Dapperbd.sqlite";
 using var connection = new SqliteConnection(connectionString);
 connection.Open();
 
